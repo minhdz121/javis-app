@@ -303,9 +303,21 @@ function qrScreen(s) {
     if (left === 0 && !document.hidden && z.status !== "scanned" && !S.renewing) { S.renewing = true; renew().finally(() => (S.renewing = false)); }
   };
   const box = h("div", { class: "qrbox" }, src ? h("img", { src, alt: "Mã QR đăng nhập Zalo" }) : h("span", { class: "muted" }, "Đang tạo mã..."));
+  // Tự xin mã khi vào màn hình (PWA cũ không tự gọi nên đứng ở "Đang tạo mã..." mãi).
+  // Thử lại có giãn cách để không đốt hạn mức 40 lượt/giờ; quá 5 lần thì để người dùng bấm nút.
+  if (src) { S.qrTries = 0; S.qrTryAt = 0; }
+  else if (!document.hidden && !S.renewing && (S.qrTries ?? 0) < 5 && (z.status === "idle" || z.status === "need_qr" || z.status === "qr_wait")) {
+    const delay = [0, 6000, 15000, 40000, 90000][Math.min(S.qrTries ?? 0, 4)];
+    if (!S.qrTryAt || Date.now() - S.qrTryAt >= delay) {
+      S.qrTries = (S.qrTries ?? 0) + 1;
+      S.qrTryAt = Date.now();
+      renew();
+    }
+  }
   show("qr", card("", h("h1", {}, "Đăng nhập Zalo"),
     h("p", {}, QR_TEXT[z.status] ?? "Đang chờ..."), box, src ? [count, bar] : null,
     h("p", { class: "err" }, z.error ? String(z.error) : ""),
+    !src && (S.qrTries ?? 0) >= 3 ? h("p", { class: "muted" }, "Chậm hơn bình thường — bấm \"Tạo mã mới\" nếu sau ~15 giây vẫn chưa có mã.") : null,
     h("div", { class: "row" },
       h("button", { class: "primary wide", disabled: !src, onclick: () => saveQr(src) }, "Lưu ảnh QR"),
       h("button", { class: "wide", onclick: renew }, "Tạo mã mới"))),
