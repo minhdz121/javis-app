@@ -322,12 +322,13 @@ function qrScreen(s) {
       h("button", { class: "primary wide", disabled: !src, onclick: () => saveQr(src) }, "Lưu ảnh QR"),
       h("button", { class: "wide", onclick: renew }, "Tạo mã mới"))),
     card("", h("h2", {}, "Cách đăng nhập"),
+      h("p", { class: "notice" }, h("b", {}, "Không cần điện thoại thứ hai. "), "Lưu ảnh QR rồi mở Zalo ngay trên máy này để quét từ thư viện ảnh."),
       h("ol", { class: "steps" },
-        h("li", {}, "Bấm \"Lưu ảnh QR\" để lưu mã vào thư viện ảnh."),
+        h("li", {}, "Bấm \"Lưu ảnh QR\" (nếu hiện bảng chia sẻ, chọn \"Lưu hình ảnh\"; không thấy thì chụp màn hình)."),
         h("li", {}, "Mở Zalo, chọn quét mã QR."),
-        h("li", {}, "Chọn ảnh từ thư viện, chọn ảnh vừa lưu."),
+        h("li", {}, "Bấm biểu tượng ảnh/thư viện trong màn hình quét, chọn ảnh vừa lưu."),
         h("li", {}, "Bấm Xác nhận đăng nhập.")),
-      h("p", { class: "muted" }, "Dự phòng: mở trang này trên máy tính hoặc máy khác rồi quét mã bằng Zalo trên điện thoại.")));
+      h("p", { class: "muted" }, "Mã có hạn 100 giây — hết hạn thì bấm \"Tạo mã mới\". Dự phòng: mở trang này trên máy tính rồi quét bằng điện thoại.")));
   if (src) { tick(); every(tick, 1000); }
 }
 
