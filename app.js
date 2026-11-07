@@ -378,6 +378,16 @@ function dashboard(s) {
       s.status === "hub-offline" ? h("p", { class: "muted" }, `Nếu ${HUB} vừa khởi động lại máy, Javis sẽ tự tìm lại địa chỉ máy chủ.`) : null,
       h("p", { class: "err" }, S.flash)),
   ];
+  const ownerInput = h("input", { type: "text", id: "owner-name", maxlength: "40", value: String(s.ownerName ?? ""), placeholder: "Tên chủ nhân", autocomplete: "off", "aria-label": "Tên chủ nhân" });
+  const ownerForm = h("form", { class: "chatform", onsubmit: async (ev) => {
+    ev.preventDefault();
+    const name = ownerInput.value.trim();
+    if (!name) { S.flash = "Hãy nhập tên."; render(s, true); return; }
+    try { await call("POST", "/name", { name }); S.flash = "Đã đổi tên chủ nhân."; poll(true); }
+    catch (e) { if (!fail(e, () => poll(true))) { S.flash = msgOf(e); render(s, true); } }
+  } }, ownerInput, h("button", { class: "primary wide", type: "submit" }, "Lưu tên"));
+  cards.push(card("", h("h2", {}, "Chủ nhân"),
+    h("p", { class: "muted" }, "Javis gọi bạn bằng tên này. Đổi lúc nào cũng được."), ownerForm));
   if (s.notice) cards.push(card("banner", h("h2", {}, "Thông báo từ " + HUB), h("p", {}, String(s.notice))));
   cards.push(h("button", { class: "big " + (s.paused ? "primary" : ""), onclick: () => post("/pause", { paused: !s.paused }) }, s.paused ? "Tiếp tục Javis" : "Tạm dừng Javis"));
   cards.push(card("", h("h2", {}, `Nhóm của bạn (${on}/${groups.length} đang bật)`),
