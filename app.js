@@ -1,11 +1,12 @@
 import CONFIG from "./config.js";
-import { CONSENT_VERSION, CONSENT_ITEMS } from "./consent.js";
+import { CONSENT_VERSION, CONSENT_ITEMS, CONSENT_NOTICES } from "./consent.js";
 import { apiOrigin, resolvePointer, NoEd25519 } from "./pointer.js";
 
 const HUB = CONFIG.hubName;
 const root = document.getElementById("app");
 const QR_RE = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
-const TYPING = new Set(["onboarding"]);
+const TYPING = new Set(["onboarding", "consent"]);
+const POLL_MS = { zalo: 2e3, starting: 2e3, unavailable: 4e3 };
 
 // localStorage có thể bị chặn (chế độ riêng tư): vẫn chạy bằng bộ nhớ tạm.
 const mem = {};
@@ -96,6 +97,10 @@ function fail(e, retry) {
   return false;
 }
 const msgOf = (e) => (e instanceof ApiError ? e.message : "Có lỗi xảy ra, hãy thử lại.");
+const ago = (t) => {
+  const m = Math.max(0, Math.round((Date.now() - Number(t || 0)) / 60000));
+  return m < 1 ? "vừa xong" : m < 60 ? `${m} phút trước` : m < 1440 ? `${Math.round(m / 60)} giờ trước` : `${Math.round(m / 1440)} ngày trước`;
+};
 
 function clearLocal() {
   store.del("token");
@@ -151,19 +156,29 @@ function intro() {
           h("li", {}, "Android (Chrome): bấm menu ba chấm, chọn \"Cài đặt ứng dụng\" hoặc \"Thêm vào màn hình chính\"."),
           h("li", {}, "Mở Javis từ biểu tượng vừa tạo."))]),
     h("div", { class: "row" },
-      h("button", { class: "primary wide", onclick: consent }, "Tiếp tục"),
+      h("button", { class: "primary wide", onclick: () => consent() }, "Tiếp tục"),
       h("button", { class: "wide", onclick: redeem }, "Tôi đã có mã ghép thiết bị")));
 }
 
-function consent() {
+function consent(next = invite) {
   const boxes = CONSENT_ITEMS.map((it) => h("input", { type: "checkbox", id: "c-" + it.id }));
-  const btn = h("button", { class: "primary wide", disabled: true, onclick: invite }, "Tôi đã hiểu, tiếp tục");
+  const btn = h("button", { class: "primary wide", disabled: true, onclick: next }, "Tôi đã hiểu, tiếp tục");
   const sync = () => (btn.disabled = !boxes.every((b) => b.checked));
   boxes.forEach((b) => b.addEventListener("change", sync));
   show("consent", card("", h("h1", {}, "Đồng ý có hiểu biết"),
-    h("p", {}, "Hãy đọc và bấm vào từng ô để xác nhận bạn đã hiểu."),
+    CONSENT_NOTICES.map((it) => h("p", { class: "notice" }, h("b", {}, it.title + " "), it.text)),
+    h("p", {}, "Bấm vào từng ô để xác nhận bạn đã hiểu."),
     CONSENT_ITEMS.map((it, i) => h("label", { class: "tick", for: "c-" + it.id }, boxes[i], h("span", {}, h("b", {}, it.title), it.text)))),
+    h("p", { class: "err" }, S.flash),
     h("div", { class: "row" }, btn));
+}
+
+const reconsent = () => act(() => call("POST", "/consent", { version: CONSENT_VERSION, ticks: CONSENT_ITEMS.map((i) => i.id) }));
+
+function waiting(s) {
+  const down = s.screen === "unavailable";
+  show(s.screen, card("", h("h1", {}, down ? "Javis tạm thời không chạy được" : "Javis đang khởi động"),
+    h("p", {}, down ? `Javis của bạn đang gặp sự cố trên máy của ${HUB}. ${HUB} sẽ kiểm tra; trang tự thử lại, bạn không cần làm gì.` : `Máy của ${HUB} đang chuẩn bị Javis cho bạn, thường mất vài giây. Trang tự thử lại.`)));
 }
 
 function invite() {
@@ -216,7 +231,7 @@ async function poll(force) {
     if (!store.get("token")) return;
     if (!s || typeof s !== "object") throw new ApiError(0, "");
     render(s, force === true);
-    S.pollTimer = setTimeout(poll, s.screen === "zalo" ? 2e3 : 5e3);
+    S.pollTimer = setTimeout(poll, POLL_MS[s.screen] ?? 5e3);
   } catch (e) {
     if (!fail(e, () => poll(true))) S.pollTimer = setTimeout(poll, 8e3);
   } finally { S.polling = false; }
@@ -238,6 +253,8 @@ function render(s, force) {
   if (s.screen === "zalo") qrScreen(s);
   else if (s.screen === "onboarding") (S.confirmed && S.confirmed === String(z.name ?? "") ? nameScreen : confirmScreen)(s);
   else if (s.screen === "dashboard") dashboard(s);
+  else if (s.screen === "consent") consent(reconsent);
+  else if (s.screen === "starting" || s.screen === "unavailable") waiting(s);
   else if (s.screen === "revoked") { clearLocal(); revoked(); }
   else if (s.screen === "removed") { clearLocal(); show("removed", card("", h("h1", {}, "Đã xóa dữ liệu và gỡ Javis"), h("p", {}, "Dữ liệu của bạn đã bị xóa khỏi máy chủ. Hãy tự đăng xuất thiết bị lạ trong Zalo để chắc chắn."))); }
   else show("loading", card("", h("h1", {}, "Đang tải..."), h("p", { class: "muted" }, "Đang chờ máy chủ chuẩn bị.")));
@@ -340,6 +357,7 @@ function dashboard(s) {
   const z = s.zalo ?? {};
   const [cls, label] = STATUS[s.status] ?? ["warn", String(s.status ?? "")];
   const groups = Array.isArray(s.groups) ? s.groups : [];
+  const devices = Array.isArray(s.devices) ? s.devices : [];
   const on = groups.filter((g) => g.on).length;
   const post = (path, body) => act(() => call("POST", path, body));
   const cards = [
@@ -358,6 +376,12 @@ function dashboard(s) {
   cards.push(card("", h("div", { class: "setting" },
     h("div", {}, h("b", {}, "Cho phép nói tục khi bị chửi trước"), h("div", { class: "muted" }, s.roughAllowed ? "Mặc định tắt." : `${HUB} chưa cho phép tính năng này.`)),
     toggle(!!s.roughOptIn && !!s.roughAllowed, "Cho phép nói tục khi bị chửi trước", (c) => post("/rough", { on: c }), !s.roughAllowed))));
+  cards.push(card("", h("h2", {}, `Thiết bị đăng nhập (${devices.length}/${s.maxDevices ?? 3})`),
+    h("p", { class: "muted" }, "Mỗi thiết bị giữ một token riêng. Máy lạ thì thu hồi ngay tại đây."),
+    devices.length ? h("div", { class: "list" }, devices.map((d) => h("div", { class: "setting" },
+      h("div", {}, h("b", {}, String(d.label || "Điện thoại")), h("div", { class: "muted" }, (d.current ? "Thiết bị này · " : "") + "hoạt động " + ago(d.lastSeen))),
+      d.current ? null : h("button", { class: "wide", onclick: () => act(async () => { await call("POST", "/devices/revoke", { id: String(d.id) }); }) }, "Thu hồi"))))
+      : h("p", { class: "muted" }, "Chưa có thiết bị nào.")));
   cards.push(card("", h("h2", {}, "Ghép thiết bị khác"),
     h("p", { class: "muted" }, "Tạo mã 8 ký tự rồi nhập ở thiết bị mới (chọn \"Tôi đã có mã ghép thiết bị\")."),
     S.pair ? h("div", { class: "code", "aria-label": "Mã ghép thiết bị" }, S.pair) : null,
