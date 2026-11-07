@@ -322,13 +322,13 @@ function qrScreen(s) {
       h("button", { class: "primary wide", disabled: !src, onclick: () => saveQr(src) }, "Lưu ảnh QR"),
       h("button", { class: "wide", onclick: renew }, "Tạo mã mới"))),
     card("", h("h2", {}, "Cách đăng nhập"),
-      h("p", { class: "notice" }, h("b", {}, "Không cần điện thoại thứ hai. "), "Lưu ảnh QR rồi mở Zalo ngay trên máy này để quét từ thư viện ảnh."),
+      h("p", { class: "notice" }, h("b", {}, "Cần một màn hình thứ hai. "), "Zalo không cho quét mã đăng nhập máy tính từ ảnh trong thư viện (lỗi 18020) — phải quét trực tiếp bằng camera."),
       h("ol", { class: "steps" },
-        h("li", {}, "Bấm \"Lưu ảnh QR\" (nếu hiện bảng chia sẻ, chọn \"Lưu hình ảnh\"; không thấy thì chụp màn hình)."),
-        h("li", {}, "Mở Zalo, chọn quét mã QR."),
-        h("li", {}, "Bấm biểu tượng ảnh/thư viện trong màn hình quét, chọn ảnh vừa lưu."),
-        h("li", {}, "Bấm Xác nhận đăng nhập.")),
-      h("p", { class: "muted" }, "Mã có hạn 100 giây — hết hạn thì bấm \"Tạo mã mới\". Dự phòng: mở trang này trên máy tính rồi quét bằng điện thoại.")));
+        h("li", {}, "Nhờ Minh mở mã QR này trên màn hình máy tính (hoặc gửi ảnh QR sang máy tính/TV)."),
+        h("li", {}, "Mở Zalo trên điện thoại, chọn quét mã QR."),
+        h("li", {}, "Quét thẳng vào màn hình đang hiện mã (không quét ảnh trong thư viện)."),
+        h("li", {}, "Bấm Xác nhận đăng nhập trong Zalo.")),
+      h("p", { class: "muted" }, "Không có màn hình thứ hai? In ảnh QR ra giấy rồi quét, hoặc dùng gương để hắt mã. Mã hết hạn sau 100 giây — bấm \"Tạo mã mới\" nếu cần.")));
   if (src) { tick(); every(tick, 1000); }
 }
 
